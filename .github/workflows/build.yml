@@ -17,7 +17,7 @@ jobs:
         go-version: 1.17.x
     - name: Build
       run: |
-        make cloudflared
+        GOOS=linux GOARCH=s390x make cloudflared
         cp cloudflared cloudflared-linux-s390x
     - name: Release
       uses: softprops/action-gh-release@v1
