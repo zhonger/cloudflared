@@ -31,7 +31,7 @@ jobs:
         GOOS=linux GOARCH=s390x make cloudflared-rpm
         cp cloudflared cloudflared-linux-s390x
         cp cloudflared_*.deb cloudfalred-linux-s390x.deb
-        cp cloudflared_*.rpm cloudfalred-linux-s390x.rpm
+        cp cloudflared-*.rpm cloudfalred-linux-s390x.rpm
     - name: Release
       uses: softprops/action-gh-release@v1
       with:
