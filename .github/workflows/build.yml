@@ -10,18 +10,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-
+    - uses: uraimo/run-on-arch-action@v2
+      name: Run commands
+      id: runcmd
+      with:
+        arch: s390x
+        distro: ubuntu-latest
     - name: Set up Go
       uses: actions/setup-go@v3
       with:
-        arch: s390x
         go-version: 1.17.x
-
     - name: Build
-      run: make cloudflared
-
-    - name: Upload assets
-      uses: actions/upload-artifact@v3
-      with: 
-        name: cloudflared-linux-s390x
-        path: cloudflared
+      run: |
+        make cloudflared
+        cp cloudflared cloudflared-linux-s390x
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          cloudlfared-linux-s390x
