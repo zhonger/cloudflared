@@ -7,7 +7,7 @@ on:
 jobs:
 
   build:
-    runs-on: ubuntu-latest
+    runs-on: debian-latest
     steps:
     - uses: actions/checkout@v3
     - uses: uraimo/run-on-arch-action@v2
@@ -15,7 +15,7 @@ jobs:
       id: runcmd
       with:
         arch: s390x
-        distro: ubuntu-latest
+        distro: debian-latest
     - name: Set up Go
       uses: actions/setup-go@v3
       with:
