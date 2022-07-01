@@ -32,6 +32,7 @@ jobs:
         cp cloudflared cloudflared-linux-s390x
         cp cloudflared_*.deb cloudfalred-linux-s390x.deb
         cp cloudflared-*.rpm cloudfalred-linux-s390x.rpm
+        sha256sum cloudflared-linux-s390x cloudfalred-linux-s390x.deb cloudfalred-linux-s390x.rpm > sha256sums.txt
     - name: Release
       uses: softprops/action-gh-release@v1
       with:
@@ -39,3 +40,4 @@ jobs:
           cloudflared-linux-s390x
           cloudfalred-linux-s390x.deb
           cloudfalred-linux-s390x.rpm
+          sha256sums.txt
