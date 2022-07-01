@@ -9,13 +9,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    - uses: uraimo/run-on-arch-action@v2
-      name: Run commands
-      id: runcmd
-      with:
-        arch: s390x
-        distro: ubuntu_latest
+    - name: Checkout
+      uses: actions/checkout@v3
     - name: Set up Go
       uses: actions/setup-go@v3
       with:
