@@ -1,0 +1,27 @@
+name: Build
+
+on:
+  release:
+    types: [created]
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        arch: s390x
+        go-version: 1.17.x
+
+    - name: Build
+      run: make cloudflared
+
+    - name: Upload assets
+      uses: actions/upload-artifact@v3
+      with: 
+        name: cloudflared-linux-s390x
+        path: cloudflared
