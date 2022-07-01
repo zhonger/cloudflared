@@ -23,4 +23,4 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          cloudlfared-linux-s390x
+          cloudflared-linux-s390x
