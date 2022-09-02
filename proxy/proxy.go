@@ -1,7 +1,6 @@
 package proxy
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -29,6 +28,8 @@ const (
 	LogFieldRule          = "ingressRule"
 	LogFieldOriginService = "originService"
 	LogFieldFlowID        = "flowID"
+
+	trailerHeaderName = "Trailer"
 )
 
 // Proxy represents a means to Proxy between cloudflared and the origin services.
@@ -63,7 +64,7 @@ func NewOriginProxy(
 // a simple roundtrip or a tcp/websocket dial depending on ingres rule setup.
 func (p *Proxy) ProxyHTTP(
 	w connection.ResponseWriter,
-	tr *tracing.TracedRequest,
+	tr *tracing.TracedHTTPRequest,
 	isWebsocket bool,
 ) error {
 	incrementRequests()
@@ -108,7 +109,7 @@ func (p *Proxy) ProxyHTTP(
 		}
 
 		rws := connection.NewHTTPResponseReadWriterAcker(w, req)
-		if err := p.proxyStream(req.Context(), rws, dest, originProxy); err != nil {
+		if err := p.proxyStream(tr.ToTracedContext(), rws, dest, originProxy); err != nil {
 			rule, srv := ruleField(p.ingressRules, ruleNum)
 			p.logRequestError(err, cfRay, "", rule, srv)
 			return err
@@ -137,9 +138,11 @@ func (p *Proxy) ProxyTCP(
 	serveCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	tracedCtx := tracing.NewTracedContext(serveCtx, req.CfTraceID, p.log)
+
 	p.log.Debug().Str(LogFieldFlowID, req.FlowID).Msg("tcp proxy stream started")
 
-	if err := p.proxyStream(serveCtx, rwa, req.Dest, p.warpRouting.Proxy); err != nil {
+	if err := p.proxyStream(tracedCtx, rwa, req.Dest, p.warpRouting.Proxy); err != nil {
 		p.logRequestError(err, req.CFRay, req.FlowID, "", ingress.ServiceWarpRouting)
 		return err
 	}
@@ -160,7 +163,7 @@ func ruleField(ing ingress.Ingress, ruleNum int) (ruleID string, srv string) {
 // ProxyHTTPRequest proxies requests of underlying type http and websocket to the origin service.
 func (p *Proxy) proxyHTTPRequest(
 	w connection.ResponseWriter,
-	tr *tracing.TracedRequest,
+	tr *tracing.TracedHTTPRequest,
 	httpService ingress.HTTPOriginProxy,
 	isWebsocket bool,
 	disableChunkedEncoding bool,
@@ -205,15 +208,16 @@ func (p *Proxy) proxyHTTPRequest(
 	tracing.EndWithStatusCode(ttfbSpan, resp.StatusCode)
 	defer resp.Body.Close()
 
-	// resp headers can be nil
-	if resp.Header == nil {
-		resp.Header = make(http.Header)
+	headers := make(http.Header, len(resp.Header))
+	// copy headers
+	for k, v := range resp.Header {
+		headers[k] = v
 	}
 
 	// Add spans to response header (if available)
-	tr.AddSpans(resp.Header, p.log)
+	tr.AddSpans(headers)
 
-	err = w.WriteRespHeaders(resp.StatusCode, resp.Header)
+	err = w.WriteRespHeaders(resp.StatusCode, headers)
 	if err != nil {
 		return errors.Wrap(err, "Error writing response header")
 	}
@@ -234,12 +238,10 @@ func (p *Proxy) proxyHTTPRequest(
 		return nil
 	}
 
-	if connection.IsServerSentEvent(resp.Header) {
-		p.log.Debug().Msg("Detected Server-Side Events from Origin")
-		p.writeEventStream(w, resp.Body)
-	} else {
-		_, _ = cfio.Copy(w, resp.Body)
-	}
+	_, _ = cfio.Copy(w, resp.Body)
+
+	// copy trailers
+	copyTrailers(w, resp)
 
 	p.logOriginResponse(resp, fields)
 	return nil
@@ -248,17 +250,23 @@ func (p *Proxy) proxyHTTPRequest(
 // proxyStream proxies type TCP and other underlying types if the connection is defined as a stream oriented
 // ingress rule.
 func (p *Proxy) proxyStream(
-	ctx context.Context,
+	tr *tracing.TracedContext,
 	rwa connection.ReadWriteAcker,
 	dest string,
 	connectionProxy ingress.StreamBasedOriginProxy,
 ) error {
+	ctx := tr.Context
+	_, connectSpan := tr.Tracer().Start(ctx, "stream-connect")
 	originConn, err := connectionProxy.EstablishConnection(ctx, dest)
 	if err != nil {
+		tracing.EndWithErrorStatus(connectSpan, err)
 		return err
 	}
+	connectSpan.End()
 
-	if err := rwa.AckConnection(); err != nil {
+	encodedSpans := tr.GetSpans()
+
+	if err := rwa.AckConnection(encodedSpans); err != nil {
 		return err
 	}
 
@@ -288,26 +296,6 @@ func (wr *bidirectionalStream) Write(p []byte) (n int, err error) {
 	return wr.writer.Write(p)
 }
 
-func (p *Proxy) writeEventStream(w connection.ResponseWriter, respBody io.ReadCloser) {
-	reader := bufio.NewReader(respBody)
-	for {
-		line, readErr := reader.ReadBytes('\n')
-
-		// We first try to write whatever we read even if an error occurred
-		// The reason for doing it is to guarantee we really push everything to the eyeball side
-		// before returning
-		if len(line) > 0 {
-			if _, writeErr := w.Write(line); writeErr != nil {
-				return
-			}
-		}
-
-		if readErr != nil {
-			return
-		}
-	}
-}
-
 func (p *Proxy) appendTagHeaders(r *http.Request) {
 	for _, tag := range p.tags {
 		r.Header.Add(TagHeaderNamePrefix+tag.Name, tag.Value)
@@ -319,6 +307,14 @@ type logFields struct {
 	lbProbe bool
 	rule    interface{}
 	flowID  string
+}
+
+func copyTrailers(w connection.ResponseWriter, response *http.Response) {
+	for trailerHeader, trailerValues := range response.Trailer {
+		for _, trailerValue := range trailerValues {
+			w.AddTrailer(trailerHeader, trailerValue)
+		}
+	}
 }
 
 func (p *Proxy) logRequest(r *http.Request, fields logFields) {

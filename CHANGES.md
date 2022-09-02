@@ -1,3 +1,15 @@
+## 2022.8.1
+### New Features
+- cloudflared now remembers if it connected to a certain protocol successfully. If it did, it does not fall back to a lower
+  protocol on connection failures.
+
+## 2022.7.1
+### New Features
+- It is now possible to connect cloudflared tunnel to Cloudflare Global Network with IPv6. See `cloudflared tunnel --help` and look for `edge-ip-version` for more information. For now, the default behavior is to still connect with IPv4 only.
+
+### Bug Fixes
+- Several bug fixes related with QUIC transport (used between cloudflared tunnel and Cloudflare Global Network). Updating to this version is highly recommended.
+
 ## 2022.4.0
 ### Bug Fixes
 - `cloudflared tunnel run` no longer logs the Tunnel token or JSON credentials in clear text as those are the secret

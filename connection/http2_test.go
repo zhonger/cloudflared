@@ -33,7 +33,7 @@ func newTestHTTP2Connection() (*HTTP2Connection, net.Conn) {
 	edgeConn, cfdConn := net.Pipe()
 	var connIndex = uint8(0)
 	log := zerolog.Nop()
-	obs := NewObserver(&log, &log, false)
+	obs := NewObserver(&log, &log)
 	controlStream := NewControlStream(
 		obs,
 		mockConnectedFuse{},
@@ -43,6 +43,7 @@ func newTestHTTP2Connection() (*HTTP2Connection, net.Conn) {
 		nil,
 		nil,
 		1*time.Second,
+		HTTP2,
 	)
 	return NewHTTP2Connection(
 		cfdConn,
@@ -356,7 +357,7 @@ func TestServeControlStream(t *testing.T) {
 		unregistered: make(chan struct{}),
 	}
 
-	obs := NewObserver(&log, &log, false)
+	obs := NewObserver(&log, &log)
 	controlStream := NewControlStream(
 		obs,
 		mockConnectedFuse{},
@@ -366,6 +367,7 @@ func TestServeControlStream(t *testing.T) {
 		rpcClientFactory.newMockRPCClient,
 		nil,
 		1*time.Second,
+		HTTP2,
 	)
 	http2Conn.controlStreamHandler = controlStream
 
@@ -407,7 +409,7 @@ func TestFailRegistration(t *testing.T) {
 		unregistered: make(chan struct{}),
 	}
 
-	obs := NewObserver(&log, &log, false)
+	obs := NewObserver(&log, &log)
 	controlStream := NewControlStream(
 		obs,
 		mockConnectedFuse{},
@@ -417,6 +419,7 @@ func TestFailRegistration(t *testing.T) {
 		rpcClientFactory.newMockRPCClient,
 		nil,
 		1*time.Second,
+		HTTP2,
 	)
 	http2Conn.controlStreamHandler = controlStream
 
@@ -453,7 +456,7 @@ func TestGracefulShutdownHTTP2(t *testing.T) {
 	events := &eventCollectorSink{}
 
 	shutdownC := make(chan struct{})
-	obs := NewObserver(&log, &log, false)
+	obs := NewObserver(&log, &log)
 	obs.RegisterSink(events)
 	controlStream := NewControlStream(
 		obs,
@@ -464,6 +467,7 @@ func TestGracefulShutdownHTTP2(t *testing.T) {
 		rpcClientFactory.newMockRPCClient,
 		shutdownC,
 		1*time.Second,
+		HTTP2,
 	)
 
 	http2Conn.controlStreamHandler = controlStream

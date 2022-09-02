@@ -3,7 +3,6 @@ name: "\U0001F41B Bug report"
 about: Create a report to help us improve cloudflared
 title: "\U0001F41B"
 labels: 'Priority: Normal, Type: Bug'
-assignees: abelinkinbio
 
 ---
 
@@ -15,6 +14,10 @@ Steps to reproduce the behavior:
 1. Configure '...'
 2. Run '....'
 3. See error
+
+If it's an issue with Cloudflare Tunnel:
+4. Tunnel ID : 
+5. cloudflared config: 
 
 **Expected behavior**
 A clear and concise description of what you expected to happen.
