@@ -9,6 +9,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+
+	"github.com/cloudflare/cloudflared/management"
 )
 
 const (
@@ -41,6 +43,19 @@ const (
 	IPv6Only ConfigIPVersion = 6
 )
 
+func (c ConfigIPVersion) String() string {
+	switch c {
+	case Auto:
+		return "auto"
+	case IPv4Only:
+		return "4"
+	case IPv6Only:
+		return "6"
+	default:
+		return ""
+	}
+}
+
 // IPVersion is the IP version of an EdgeAddr
 type EdgeIPVersion int8
 
@@ -71,11 +86,14 @@ type EdgeAddr struct {
 // If the call to net.LookupSRV fails, try to fall back to DoT from Cloudflare directly.
 //
 // Note: Instead of DoT, we could also have used DoH. Either of these:
-//     - directly via the JSON API (https://1.1.1.1/dns-query?ct=application/dns-json&name=_origintunneld._tcp.argotunnel.com&type=srv)
-//     - indirectly via `tunneldns.NewUpstreamHTTPS()`
+//   - directly via the JSON API (https://1.1.1.1/dns-query?ct=application/dns-json&name=_origintunneld._tcp.argotunnel.com&type=srv)
+//   - indirectly via `tunneldns.NewUpstreamHTTPS()`
+//
 // But both of these cases miss out on a key feature from the stdlib:
-//     "The returned records are sorted by priority and randomized by weight within a priority."
-//     (https://golang.org/pkg/net/#Resolver.LookupSRV)
+//
+//	"The returned records are sorted by priority and randomized by weight within a priority."
+//	(https://golang.org/pkg/net/#Resolver.LookupSRV)
+//
 // Does this matter? I don't know. It may someday. Let's use DoT so we don't need to worry about it.
 // See also: Go feature request for stdlib-supported DoH: https://github.com/golang/go/issues/27552
 var fallbackLookupSRV = lookupSRVWithDOT
@@ -92,16 +110,20 @@ var friendlyDNSErrorLines = []string{
 
 // EdgeDiscovery implements HA service discovery lookup.
 func edgeDiscovery(log *zerolog.Logger, srvService string) ([][]*EdgeAddr, error) {
-	log.Debug().Str("domain", "_"+srvService+"._"+srvProto+"."+srvName).Msg("looking up edge SRV record")
+	logger := log.With().Int(management.EventTypeKey, int(management.Cloudflared)).Logger()
+	logger.Debug().
+		Int(management.EventTypeKey, int(management.Cloudflared)).
+		Str("domain", "_"+srvService+"._"+srvProto+"."+srvName).
+		Msg("edge discovery: looking up edge SRV record")
 
 	_, addrs, err := netLookupSRV(srvService, srvProto, srvName)
 	if err != nil {
 		_, fallbackAddrs, fallbackErr := fallbackLookupSRV(srvService, srvProto, srvName)
 		if fallbackErr != nil || len(fallbackAddrs) == 0 {
 			// use the original DNS error `err` in messages, not `fallbackErr`
-			log.Err(err).Msg("Error looking up Cloudflare edge IPs: the DNS query failed")
+			logger.Err(err).Msg("edge discovery: error looking up Cloudflare edge IPs: the DNS query failed")
 			for _, s := range friendlyDNSErrorLines {
-				log.Error().Msg(s)
+				logger.Error().Msg(s)
 			}
 			return nil, errors.Wrapf(err, "Could not lookup srv records on _%v._%v.%v", srvService, srvProto, srvName)
 		}
@@ -115,9 +137,13 @@ func edgeDiscovery(log *zerolog.Logger, srvService string) ([][]*EdgeAddr, error
 		if err != nil {
 			return nil, err
 		}
-		for _, e := range edgeAddrs {
-			log.Debug().Msgf("Edge Address: %+v", *e)
+		logAddrs := make([]string, len(edgeAddrs))
+		for i, e := range edgeAddrs {
+			logAddrs[i] = e.UDP.IP.String()
 		}
+		logger.Debug().
+			Strs("addresses", logAddrs).
+			Msg("edge discovery: resolved edge addresses")
 		resolvedAddrPerCNAME = append(resolvedAddrPerCNAME, edgeAddrs)
 	}
 
@@ -172,13 +198,15 @@ func ResolveAddrs(addrs []string, log *zerolog.Logger) (resolved []*EdgeAddr) {
 	for _, addr := range addrs {
 		tcpAddr, err := net.ResolveTCPAddr("tcp", addr)
 		if err != nil {
-			log.Error().Str(logFieldAddress, addr).Err(err).Msg("failed to resolve to TCP address")
+			log.Error().Int(management.EventTypeKey, int(management.Cloudflared)).
+				Str(logFieldAddress, addr).Err(err).Msg("edge discovery: failed to resolve to TCP address")
 			continue
 		}
 
 		udpAddr, err := net.ResolveUDPAddr("udp", addr)
 		if err != nil {
-			log.Error().Str(logFieldAddress, addr).Err(err).Msg("failed to resolve to UDP address")
+			log.Error().Int(management.EventTypeKey, int(management.Cloudflared)).
+				Str(logFieldAddress, addr).Err(err).Msg("edge discovery: failed to resolve to UDP address")
 			continue
 		}
 		version := V6

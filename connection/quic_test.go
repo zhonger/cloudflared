@@ -11,14 +11,13 @@ import (
 	"net/url"
 	"os"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/gobwas/ws/wsutil"
 	"github.com/google/uuid"
-	"github.com/lucas-clemente/quic-go"
 	"github.com/pkg/errors"
+	"github.com/quic-go/quic-go"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -26,15 +25,15 @@ import (
 	"github.com/cloudflare/cloudflared/datagramsession"
 	quicpogs "github.com/cloudflare/cloudflared/quic"
 	"github.com/cloudflare/cloudflared/tracing"
+	"github.com/cloudflare/cloudflared/tunnelrpc/pogs"
 	tunnelpogs "github.com/cloudflare/cloudflared/tunnelrpc/pogs"
 )
 
 var (
 	testTLSServerConfig = quicpogs.GenerateTLSConfig()
 	testQUICConfig      = &quic.Config{
-		ConnectionIDLength: 16,
-		KeepAlivePeriod:    5 * time.Second,
-		EnableDatagrams:    true,
+		KeepAlivePeriod: 5 * time.Second,
+		EnableDatagrams: true,
 	}
 )
 
@@ -43,13 +42,6 @@ var _ ReadWriteAcker = (*streamReadWriteAcker)(nil)
 // TestQUICServer tests if a quic server accepts and responds to a quic client with the acceptance protocol.
 // It also serves as a demonstration for communication with the QUIC connection started by a cloudflared.
 func TestQUICServer(t *testing.T) {
-	// Start a UDP Listener for QUIC.
-	udpAddr, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
-	require.NoError(t, err)
-	udpListener, err := net.ListenUDP(udpAddr.Network(), udpAddr)
-	require.NoError(t, err)
-	defer udpListener.Close()
-
 	// This is simply a sample websocket frame message.
 	wsBuf := &bytes.Buffer{}
 	wsutil.WriteClientBinary(wsBuf, []byte("Hello"))
@@ -141,24 +133,39 @@ func TestQUICServer(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
+	for i, test := range tests {
+		test := test // capture range variable
 		t.Run(test.desc, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
-			var wg sync.WaitGroup
-			wg.Add(1)
+			// Start a UDP Listener for QUIC.
+			udpAddr, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
+			require.NoError(t, err)
+			udpListener, err := net.ListenUDP(udpAddr.Network(), udpAddr)
+			require.NoError(t, err)
+			defer udpListener.Close()
+			quicTransport := &quic.Transport{Conn: udpListener, ConnectionIDLength: 16}
+			quicListener, err := quicTransport.Listen(testTLSServerConfig, testQUICConfig)
+			require.NoError(t, err)
+
+			serverDone := make(chan struct{})
 			go func() {
-				defer wg.Done()
 				quicServer(
-					t, udpListener, testTLSServerConfig, testQUICConfig,
-					test.dest, test.connectionType, test.metadata, test.message, test.expectedResponse,
+					ctx, t, quicListener, test.dest, test.connectionType, test.metadata, test.message, test.expectedResponse,
 				)
+				close(serverDone)
 			}()
 
-			qc := testQUICConnection(udpListener.LocalAddr(), t)
-			go qc.Serve(ctx)
+			qc := testQUICConnection(udpListener.LocalAddr(), t, uint8(i))
 
-			wg.Wait()
+			connDone := make(chan struct{})
+			go func() {
+				qc.Serve(ctx)
+				close(connDone)
+			}()
+
+			<-serverDone
 			cancel()
+			<-connDone
 		})
 	}
 }
@@ -176,23 +183,16 @@ func (fakeControlStream) IsStopped() bool {
 }
 
 func quicServer(
+	ctx context.Context,
 	t *testing.T,
-	conn net.PacketConn,
-	tlsConf *tls.Config,
-	config *quic.Config,
+	listener *quic.Listener,
 	dest string,
 	connectionType quicpogs.ConnectionType,
 	metadata []quicpogs.Metadata,
 	message []byte,
 	expectedResponse []byte,
 ) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	earlyListener, err := quic.Listen(conn, tlsConf, config)
-	require.NoError(t, err)
-
-	session, err := earlyListener.Accept(ctx)
+	session, err := listener.Accept(ctx)
 	require.NoError(t, err)
 
 	quicStream, err := session.OpenStreamSync(context.Background())
@@ -481,8 +481,9 @@ func TestBuildHTTPRequest(t *testing.T) {
 
 	log := zerolog.Nop()
 	for _, test := range tests {
+		test := test // capture range variable
 		t.Run(test.name, func(t *testing.T) {
-			req, err := buildHTTPRequest(context.Background(), test.connectRequest, test.body, &log)
+			req, err := buildHTTPRequest(context.Background(), test.connectRequest, test.body, 0, &log)
 			assert.NoError(t, err)
 			test.req = test.req.WithContext(req.Context())
 			assert.Equal(t, test.req, req.Request)
@@ -518,7 +519,8 @@ func TestServeUDPSession(t *testing.T) {
 		edgeQUICSessionChan <- edgeQUICSession
 	}()
 
-	qc := testQUICConnection(val, t)
+	// Random index to avoid reusing port
+	qc := testQUICConnection(val, t, 28)
 	go qc.Serve(ctx)
 
 	edgeQUICSession := <-edgeQUICSessionChan
@@ -554,7 +556,7 @@ func TestNopCloserReadWriterCloseAfterEOF(t *testing.T) {
 	require.Equal(t, n, 9)
 
 	// force another read to read eof
-	n, err = readerWriter.Read(buffer)
+	_, err = readerWriter.Read(buffer)
 	require.Equal(t, err, io.EOF)
 
 	// close
@@ -564,6 +566,37 @@ func TestNopCloserReadWriterCloseAfterEOF(t *testing.T) {
 	n, err = readerWriter.Read(buffer)
 	require.Equal(t, n, 0)
 	require.Equal(t, err, io.EOF)
+}
+
+func TestCreateUDPConnReuseSourcePort(t *testing.T) {
+	logger := zerolog.Nop()
+	conn, err := createUDPConnForConnIndex(0, nil, &logger)
+	require.NoError(t, err)
+
+	getPortFunc := func(conn *net.UDPConn) int {
+		addr := conn.LocalAddr().(*net.UDPAddr)
+		return addr.Port
+	}
+
+	initialPort := getPortFunc(conn)
+
+	// close conn
+	conn.Close()
+
+	// should get the same port as before.
+	conn, err = createUDPConnForConnIndex(0, nil, &logger)
+	require.NoError(t, err)
+	require.Equal(t, initialPort, getPortFunc(conn))
+
+	// new index, should get a different port
+	conn1, err := createUDPConnForConnIndex(1, nil, &logger)
+	require.NoError(t, err)
+	require.NotEqual(t, initialPort, getPortFunc(conn1))
+
+	// not closing the conn and trying to obtain a new conn for same index should give a different random port
+	conn, err = createUDPConnForConnIndex(0, nil, &logger)
+	require.NoError(t, err)
+	require.NotEqual(t, initialPort, getPortFunc(conn))
 }
 
 func serveSession(ctx context.Context, qc *QUICConnection, edgeQUICSession quic.Connection, closeType closeReason, expectedReason string, t *testing.T) {
@@ -582,8 +615,12 @@ func serveSession(ctx context.Context, qc *QUICConnection, edgeQUICSession quic.
 		close(sessionDone)
 	}()
 
-	// Send a message to the quic session on edge side, it should be deumx to this datagram session
-	muxedPayload := append(payload, sessionID[:]...)
+	// Send a message to the quic session on edge side, it should be deumx to this datagram v2 session
+	muxedPayload, err := quicpogs.SuffixSessionID(sessionID, payload)
+	require.NoError(t, err)
+	muxedPayload, err = quicpogs.SuffixType(muxedPayload, quicpogs.DatagramTypeUDP)
+	require.NoError(t, err)
+
 	err = edgeQUICSession.SendMessage(muxedPayload)
 	require.NoError(t, err)
 
@@ -652,8 +689,8 @@ type mockSessionRPCServer struct {
 	calledUnregisterChan chan struct{}
 }
 
-func (s mockSessionRPCServer) RegisterUdpSession(ctx context.Context, sessionID uuid.UUID, dstIP net.IP, dstPort uint16, closeIdleAfter time.Duration) error {
-	return fmt.Errorf("mockSessionRPCServer doesn't implement RegisterUdpSession")
+func (s mockSessionRPCServer) RegisterUdpSession(ctx context.Context, sessionID uuid.UUID, dstIP net.IP, dstPort uint16, closeIdleAfter time.Duration, traceContext string) (*pogs.RegisterUdpSessionResponse, error) {
+	return nil, fmt.Errorf("mockSessionRPCServer doesn't implement RegisterUdpSession")
 }
 
 func (s mockSessionRPCServer) UnregisterUdpSession(ctx context.Context, sessionID uuid.UUID, reason string) error {
@@ -667,16 +704,21 @@ func (s mockSessionRPCServer) UnregisterUdpSession(ctx context.Context, sessionI
 	return nil
 }
 
-func testQUICConnection(udpListenerAddr net.Addr, t *testing.T) *QUICConnection {
+func testQUICConnection(udpListenerAddr net.Addr, t *testing.T, index uint8) *QUICConnection {
 	tlsClientConfig := &tls.Config{
 		InsecureSkipVerify: true,
 		NextProtos:         []string{"argotunnel"},
 	}
 	// Start a mock httpProxy
 	log := zerolog.New(os.Stdout)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	qc, err := NewQUICConnection(
+		ctx,
 		testQUICConfig,
 		udpListenerAddr,
+		nil,
+		index,
 		tlsClientConfig,
 		&mockOrchestrator{originProxy: &mockOriginProxyWithRequest{}},
 		&tunnelpogs.ConnectionOptions{},

@@ -39,8 +39,6 @@ var (
 )
 
 const (
-	DefaultCredentialFile = "cert.pem"
-
 	// BastionFlag is to enable bastion, or jump host, operation
 	BastionFlag = "bastion"
 )
@@ -229,6 +227,19 @@ type OriginRequestConfig struct {
 	IPRules []IngressIPRule `yaml:"ipRules" json:"ipRules,omitempty"`
 	// Attempt to connect to origin with HTTP/2
 	Http2Origin *bool `yaml:"http2Origin" json:"http2Origin,omitempty"`
+	// Access holds all access related configs
+	Access *AccessConfig `yaml:"access" json:"access,omitempty"`
+}
+
+type AccessConfig struct {
+	// Required when set to true will fail every request that does not arrive through an access authenticated endpoint.
+	Required bool `yaml:"required" json:"required,omitempty"`
+
+	// TeamName is the organization team name to get the public key certificates for.
+	TeamName string `yaml:"teamName" json:"teamName"`
+
+	// AudTag is the AudTag to verify access JWT against.
+	AudTag []string `yaml:"audTag" json:"audTag"`
 }
 
 type IngressIPRule struct {
@@ -378,7 +389,8 @@ func ReadConfigFile(c *cli.Context, log *zerolog.Logger) (settings *configFileSe
 	log.Debug().Msgf("Loading configuration from %s", configFile)
 	file, err := os.Open(configFile)
 	if err != nil {
-		if os.IsNotExist(err) {
+		// If does not exist and config file was not specificly specified then return ErrNoConfigFile found.
+		if os.IsNotExist(err) && !c.IsSet("config") {
 			err = ErrNoConfigFile
 		}
 		return nil, "", err

@@ -73,15 +73,16 @@ func Init(version string) {
 type TracedHTTPRequest struct {
 	*http.Request
 	*cfdTracer
+	ConnIndex uint8 // The connection index used to proxy the request
 }
 
 // NewTracedHTTPRequest creates a new tracer for the current HTTP request context.
-func NewTracedHTTPRequest(req *http.Request, log *zerolog.Logger) *TracedHTTPRequest {
+func NewTracedHTTPRequest(req *http.Request, connIndex uint8, log *zerolog.Logger) *TracedHTTPRequest {
 	ctx, exists := extractTrace(req)
 	if !exists {
-		return &TracedHTTPRequest{req, &cfdTracer{trace.NewNoopTracerProvider(), &NoopOtlpClient{}, log}}
+		return &TracedHTTPRequest{req, &cfdTracer{trace.NewNoopTracerProvider(), &NoopOtlpClient{}, log}, connIndex}
 	}
-	return &TracedHTTPRequest{req.WithContext(ctx), newCfdTracer(ctx, log)}
+	return &TracedHTTPRequest{req.WithContext(ctx), newCfdTracer(ctx, log), connIndex}
 }
 
 func (tr *TracedHTTPRequest) ToTracedContext() *TracedContext {
@@ -93,7 +94,7 @@ type TracedContext struct {
 	*cfdTracer
 }
 
-// NewTracedHTTPRequest creates a new tracer for the current HTTP request context.
+// NewTracedContext creates a new tracer for the current context.
 func NewTracedContext(ctx context.Context, traceContext string, log *zerolog.Logger) *TracedContext {
 	ctx, exists := extractTraceFromString(ctx, traceContext)
 	if !exists {
@@ -155,6 +156,24 @@ func (cft *cfdTracer) GetSpans() (enc string) {
 	return
 }
 
+// GetProtoSpans returns the spans as the otlp traces in protobuf byte array.
+func (cft *cfdTracer) GetProtoSpans() (proto []byte) {
+	proto, err := cft.exporter.ExportProtoSpans()
+	switch err {
+	case nil:
+		break
+	case errNoTraces:
+		cft.log.Trace().Err(err).Msgf("expected traces to be available")
+		return
+	case errNoopTracer:
+		return // noop tracer has no traces
+	default:
+		cft.log.Debug().Err(err)
+		return
+	}
+	return
+}
+
 // AddSpans assigns spans as base64 encoded protobuf otlp traces to provided
 // HTTP headers.
 func (cft *cfdTracer) AddSpans(headers http.Header) {
@@ -169,6 +188,11 @@ func (cft *cfdTracer) AddSpans(headers http.Header) {
 	}
 
 	headers[CanonicalCloudflaredTracingHeader] = []string{enc}
+}
+
+// End will set the OK status for the span and then end it.
+func End(span trace.Span) {
+	endSpan(span, -1, codes.Ok, nil)
 }
 
 // EndWithErrorStatus will set a status for the span and then end it.
@@ -223,7 +247,6 @@ func extractTraceFromString(ctx context.Context, trace string) (context.Context,
 		parts[0] = strings.Repeat("0", left) + parts[0]
 		trace = strings.Join(parts, separator)
 	}
-
 	// Override the 'cf-trace-id' as 'uber-trace-id' so the jaeger propagator can extract it.
 	traceHeader := map[string]string{TracerContextNameOverride: trace}
 	remoteCtx := otel.GetTextMapPropagator().Extract(ctx, propagation.MapCarrier(traceHeader))
@@ -254,6 +277,11 @@ func extractTrace(req *http.Request) (context.Context, bool) {
 	if traceHeader[TracerContextNameOverride] == "" {
 		return nil, false
 	}
+
 	remoteCtx := otel.GetTextMapPropagator().Extract(req.Context(), propagation.MapCarrier(traceHeader))
 	return remoteCtx, true
+}
+
+func NewNoopSpan() trace.Span {
+	return trace.SpanFromContext(nil)
 }

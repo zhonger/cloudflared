@@ -1,3 +1,208 @@
+2023.5.1
+- 2023-05-16 TUN-7424: Add CORS headers to host_details responses
+- 2023-05-11 TUN-7421: Add *.cloudflare.com to permitted Origins for management WebSocket requests
+- 2023-05-05 TUN-7404: Default configuration version set to -1
+- 2023-05-05 TUN-7227: Migrate to devincarr/quic-go
+
+2023.5.0
+- 2023-04-27 TUN-7398: Add support for quic safe stream to set deadline
+- 2023-04-26 TUN-7394: Retry StartFirstTunnel on quic.ApplicationErrors
+- 2023-04-26 TUN-7392: Ignore release checksum upload if asset already uploaded
+- 2023-04-25 TUN-7392: Ignore duplicate artifact uploads for github release
+- 2023-04-25 TUN-7393: Add json output for cloudflared tail
+- 2023-04-24 TUN-7390: Remove Debian stretch builds
+
+2023.4.2
+- 2023-04-24 TUN-7133: Add sampling support for streaming logs
+- 2023-04-21 TUN-7141: Add component tests for streaming logs
+- 2023-04-21 TUN-7373: Streaming logs override for same actor
+- 2023-04-20 TUN-7383: Bump requirements.txt
+- 2023-04-19 TUN-7361: Add a label to override hostname
+- 2023-04-19 TUN-7378: Remove RPC debug logs
+- 2023-04-18 TUN-7360: Add Get Host Details handler in management service
+- 2023-04-17 AUTH-3122 Verify that Access tokens are still valid in curl command
+- 2023-04-17 TUN-7129: Categorize TCP logs for streaming logs
+- 2023-04-17 TUN-7130: Categorize UDP logs for streaming logs
+- 2023-04-10 AUTH-4887 Add aud parameter to token transfer url
+
+2023.4.1
+- 2023-04-13 TUN-7368: Report destination address for TCP requests in logs
+- 2023-04-12 TUN-7134: Acquire token for cloudflared tail
+- 2023-04-12 TUN-7131: Add cloudflared log event to connection messages and enable streaming logs
+- 2023-04-11 TUN-7132 TUN-7136: Add filter support for streaming logs
+- 2023-04-06 TUN-7354: Don't warn for empty ingress rules when using --token
+- 2023-04-06 TUN-7128: Categorize logs from public hostname locations
+- 2023-04-06 TUN-7351: Add streaming logs session ping and timeout
+- 2023-04-06 TUN-7335: Fix cloudflared update not working in windows
+
+2023.4.0
+- 2023-04-07 TUN-7356: Bump golang.org/x/net package to 0.7.0
+- 2023-04-07 TUN-7357: Bump to go 1.19.6
+- 2023-04-06 TUN-7127: Disconnect logger level requirement for management
+- 2023-04-05 TUN-7332: Remove legacy tunnel force flag
+- 2023-04-05 TUN-7135: Add cloudflared tail
+- 2023-04-04 Add suport for OpenBSD (#916)
+- 2023-04-04 Fix typo (#918)
+- 2023-04-04 TUN-7125: Add management streaming logs WebSocket protocol
+- 2023-03-30 TUN-9999: Remove classic tunnel component tests
+- 2023-03-30 TUN-7126: Add Management logger io.Writer
+- 2023-03-29 TUN-7324: Add http.Hijacker to connection.ResponseWriter
+- 2023-03-29 TUN-7333: Default features checkable at runtime across all packages
+- 2023-03-21 TUN-7124: Add intercept ingress rule for management requests
+
+2023.3.1
+- 2023-03-13 TUN-7271: Return 503 status code when no ingress rules configured
+- 2023-03-10 TUN-7272: Fix cloudflared returning non supported status service which breaks configuration migration
+- 2023-03-09 TUN-7259: Add warning for missing ingress rules
+- 2023-03-09 TUN-7268: Default to Program Files as location for win32
+- 2023-03-07 TUN-7252: Remove h2mux connection
+- 2023-03-07 TUN-7253: Adopt http.ResponseWriter for connection.ResponseWriter
+- 2023-03-06 TUN-7245: Add bastion flag to origin service check
+- 2023-03-06 EDGESTORE-108: Remove deprecated s3v2 signature
+- 2023-03-02 TUN-7226: Fixed a missed rename
+
+2023.3.0
+- 2023-03-01 GH-352: Add Tunnel CLI option "edge-bind-address" (#870)
+- 2023-03-01 Fixed WIX template to allow MSI upgrades (#838)
+- 2023-02-28 TUN-7213: Decode Base64 encoded key before writing it
+- 2023-02-28 check.yaml: update actions to v3 (#876)
+- 2023-02-27 TUN-7213: Debug homebrew-cloudflare  build
+- 2023-02-15 RTG-2476 Add qtls override for Go 1.20
+
+2023.2.2
+- 2023-02-22 TUN-7197: Add connIndex tag to debug messages of incoming requests
+- 2023-02-08 TUN-7167: Respect protocol overrides with --token
+- 2023-02-06 TUN-7065: Remove classic tunnel creation
+- 2023-02-06 TUN-6938: Force h2mux protocol to http2 for named tunnels
+- 2023-02-06 TUN-6938: Provide QUIC as first in protocol list
+- 2023-02-03 TUN-7158: Correct TCP tracing propagation
+- 2023-02-01 TUN-7151: Update changes file with latest release notices
+
+2023.2.1
+- 2023-02-01 TUN-7065: Revert Ingress Rule check for named tunnel configurations
+- 2023-02-01 Revert "TUN-7065: Revert Ingress Rule check for named tunnel configurations"
+- 2023-02-01 Revert "TUN-7065: Remove classic tunnel creation"
+2023.1.0
+- 2023-01-10 TUN-7064: RPM digests are now sha256 instead of md5sum
+- 2023-01-04 RTG-2418 Update qtls
+- 2022-12-24 TUN-7057: Remove dependency github.com/gorilla/mux
+- 2022-12-24 TUN-6724: Migrate to sentry-go from raven-go
+
+2022.12.1
+- 2022-12-20 TUN-7021: Fix proxy-dns not starting when cloudflared tunnel is run
+- 2022-12-15 TUN-7010: Changelog for release 2022.12.0
+
+2022.12.0
+- 2022-12-14 TUN-6999: cloudflared should attempt other edge addresses before falling back on protocol
+- 2022-12-13 TUN-7004: Dont show local config dirs for remotely configured tuns
+- 2022-12-12 TUN-7003: Tempoarily disable erroneous notarize-app
+- 2022-12-12 TUN-7003: Add back a missing fi
+- 2022-12-07 TUN-7000: Reduce metric cardinality of closedConnections metric by removing error as tag
+- 2022-12-07 TUN-6994: Improve logging config file not found
+- 2022-12-07 TUN-7002: Randomise first region selection
+- 2022-12-07 TUN-6995: Disable quick-tunnels spin up by default
+- 2022-12-05 TUN-6984: Add bash set x to improve visibility during builds
+- 2022-12-05 TUN-6984: [CI] Ignore security import errors for code_sigining
+- 2022-12-05 TUN-6984: [CI] Don't fail on unset.
+- 2022-11-30 TUN-6984: Set euo pipefile for homebrew builds
+
+2022.11.1
+- 2022-11-29 TUN-6981: We should close UDP socket if failed to connecto to edge
+- 2022-11-25 CUSTESC-23757: Fix a bug where a wildcard ingress rule would match an host without starting with a dot
+- 2022-11-24 TUN-6970: Print newline when printing tunnel token
+- 2022-11-22 TUN-6963: Refactor Metrics service setup
+2022.11.0
+- 2022-11-16 Revert "TUN-6935: Cloudflared should use APIToken instead of serviceKey"
+- 2022-11-16 TUN-6929: Use same protocol for other connections as first one
+- 2022-11-14 TUN-6941: Reduce log level to debug when failing to proxy ICMP reply
+- 2022-11-14 TUN-6935: Cloudflared should use APIToken instead of serviceKey
+- 2022-11-14 TUN-6935: Cloudflared should use APIToken instead of serviceKey
+- 2022-11-11 TUN-6937: Bump golang.org/x/* packages to new release tags
+- 2022-11-10 ZTC-234: macOS tests
+- 2022-11-09 TUN-6927: Refactor validate access configuration to allow empty audTags only
+- 2022-11-08 ZTC-234: Replace ICMP funnels when ingress connection changes
+- 2022-11-04 TUN-6917: Bump go to 1.19.3
+- 2022-11-02 Issue #574: Better ssh config for short-lived cert (#763)
+- 2022-10-28 TUN-6898: Fix bug handling IPv6 based ingresses with missing port
+- 2022-10-28 TUN-6898: Refactor addPortIfMissing
+2022.10.3
+- 2022-10-24 TUN-6871: Add default feature to cloudflared to support EOF on QUIC connections
+- 2022-10-19 TUN-6876: Fix flaky TestTraceICMPRouterEcho by taking account request span can return before reply
+- 2022-10-18 TUN-6867: Clear spans right after they are serialized to avoid returning duplicate spans
+2022.10.2
+- 2022-10-18 TUN-6869: Fix Makefile complaining about missing GO packages
+- 2022-10-18 TUN-6864: Don't reuse port in quic unit tests
+- 2022-10-18 TUN-6868: Return left padded tracing ID when tracing identity is converted to string
+
+2022.10.1
+- 2022-10-16 TUN-6861: Trace ICMP on Windows
+- 2022-10-15 TUN-6860: Send access configuration keys to the edge
+- 2022-10-14 TUN-6858: Trace ICMP reply
+- 2022-10-13 TUN-6855: Add DatagramV2Type for IP packet with trace and tracing spans
+- 2022-10-13 TUN-6856: Refactor to lay foundation for tracing ICMP
+- 2022-10-13 TUN-6604: Trace icmp echo request on Linux and Darwin
+- 2022-10-12 Fix log message (#591)
+- 2022-10-12 TUN-6853: Reuse source port when connecting to the edge for quic connections
+- 2022-10-11 TUN-6829: Allow user of datagramsession to control logging level of errors
+- 2022-10-10 RTG-2276 Update qtls and go mod tidy
+- 2022-10-05 Add post-quantum flag to quick tunnel
+- 2022-10-05 TUN-6823: Update github release message to pull from KV
+- 2022-10-04 TUN-6825: Fix cloudflared:version images require arch hyphens
+- 2022-10-03 TUN-6806: Add ingress rule number to log when filtering due to middlware handler
+- 2022-08-17 Label correct container
+- 2022-08-16 Fix typo in help text for `cloudflared tunnel route lb`
+- 2022-07-18 drop usage of cat when sed is invoked to generate the manpage
+- 2021-03-15 update-build-readme
+- 2021-03-15 fix link
+
+2022.10.0
+- 2022-09-30 TUN-6755: Remove unused publish functions
+- 2022-09-30 TUN-6813: Only proxy ICMP packets when warp-routing is enabled
+- 2022-09-29 TUN-6811: Ping group range should be parsed as int32
+- 2022-09-29 TUN-6812: Drop IP packets if ICMP proxy is not initialized
+- 2022-09-28 TUN-6716: Document limitation of Windows ICMP proxy
+- 2022-09-28 TUN-6810: Add component test for post-quantum
+- 2022-09-27 TUN-6715: Provide suggestion to add cloudflared to ping_group_range if it failed to open ICMP socket
+- 2022-09-22 TUN-6792: Fix brew core release by not auditing the formula
+- 2022-09-22 TUN-6774: Validate OriginRequest.Access to add Ingress.Middleware
+- 2022-09-22 TUN-6775: Add middleware.Handler verification to ProxyHTTP
+- 2022-09-22 TUN-6791: Calculate ICMPv6 checksum
+- 2022-09-22 TUN-6801: Add punycode alternatives for ingress rules
+- 2022-09-21 TUN-6772: Add a JWT Validator as an ingress verifier
+- 2022-09-21 TUN-6772: Add a JWT Validator as an ingress verifier
+- 2022-09-21 TUN-6774: Validate OriginRequest.Access to add Ingress.Middleware
+- 2022-09-21 TUN-6772: Add a JWT Validator as an ingress verifier
+- 2022-09-20 TUN-6741: ICMP proxy tries to listen on specific IPv4 & IPv6 when possible
+2022.9.1
+- 2022-09-20 TUN-6777: Fix race condition in TestFunnelIdleTimeout
+- 2022-09-20 TUN-6595: Enable datagramv2 and icmp proxy by default
+- 2022-09-20 TUN-6773: Add access based configuration to ingress.OriginRequestConfig
+- 2022-09-19 TUN-6778: Cleanup logs about ICMP
+- 2022-09-19 TUN-6779: cloudflared should also use the root CAs from system pool to validate edge certificate
+- 2022-09-19 TUN-6780: Add support for certReload to also include support for client certificates
+- 2022-09-16 TUN-6767: Build ICMP proxy for Windows only when CGO is enabled
+- 2022-09-15 TUN-6590: Use Windows Teamcity agent to build binary
+- 2022-09-13 TUN-6592: Decrement TTL and return ICMP time exceed if it's 0
+- 2022-09-09 TUN-6749: Fix icmp_generic build
+- 2022-09-09 TUN-6744: On posix platforms, assign unique echo ID per (src, dst, echo ID)
+- 2022-09-08 TUN-6743: Support ICMPv6 echo on Windows
+- 2022-09-08 TUN-6689: Utilize new RegisterUDPSession to begin tracing
+- 2022-09-07 TUN-6688: Update RegisterUdpSession capnproto to include trace context
+- 2022-09-06 TUN-6740: Detect no UDP packets allowed and fallback from QUIC in that case
+- 2022-09-06 TUN-6654: Support ICMPv6 on Linux and Darwin
+- 2022-09-02 TUN-6696: Refactor flow into funnel and close idle funnels
+- 2022-09-02 TUN-6718: Bump go and go-boring 1.18.6
+- 2022-08-29 TUN-6531: Implement ICMP proxy for Windows using IcmpSendEcho
+- 2022-08-24 RTG-1339 Support post-quantum hybrid key exchange
+
+2022.9.0
+- 2022-09-05 TUN-6737: Fix datagramV2Type should be declared in its own block so it starts at 0
+- 2022-09-01 TUN-6725: Fix testProxySSEAllData
+- 2022-09-01 TUN-6726: Fix maxDatagramPayloadSize for Windows QUIC datagrams
+- 2022-09-01 TUN-6729: Fix flaky TestClosePreviousProxies
+- 2022-09-01 TUN-6728: Verify http status code ingress rule
+- 2022-08-25 TUN-6695: Implement ICMP proxy for linux
+
 2022.8.4
 - 2022-08-31 TUN-6717: Update Github action to run with Go 1.19
 - 2022-08-31 TUN-6720: Remove forcibly closing connection during reconnect signal

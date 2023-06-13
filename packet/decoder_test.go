@@ -61,11 +61,13 @@ func TestDecodeICMP(t *testing.T) {
 			Src:      netip.MustParseAddr("172.16.0.1"),
 			Dst:      netip.MustParseAddr("10.0.0.1"),
 			Protocol: layers.IPProtocolICMPv4,
+			TTL:      DefaultTTL,
 		}
 		ipv6Packet = IP{
 			Src:      netip.MustParseAddr("fd51:2391:523:f4ee::1"),
 			Dst:      netip.MustParseAddr("fd51:2391:697:f4ee::2"),
 			Protocol: layers.IPProtocolICMPv6,
+			TTL:      DefaultTTL,
 		}
 		icmpID  = 100
 		icmpSeq = 52819
@@ -150,6 +152,7 @@ func TestDecodeICMP(t *testing.T) {
 
 		require.Equal(t, test.packet.Type, icmpPacket.Type)
 		require.Equal(t, test.packet.Code, icmpPacket.Code)
+		assertICMPChecksum(t, icmpPacket)
 		require.Equal(t, test.packet.Body, icmpPacket.Body)
 		expectedBody, err := test.packet.Body.Marshal(test.packet.Type.Protocol())
 		require.NoError(t, err)
@@ -171,7 +174,7 @@ func TestDecodeBadPackets(t *testing.T) {
 		SrcIP:    srcIPv4,
 		DstIP:    dstIPv4,
 		Protocol: layers.IPProtocolICMPv4,
-		TTL:      defaultTTL,
+		TTL:      DefaultTTL,
 	}
 	icmpLayer := layers.ICMPv4{
 		TypeCode: layers.CreateICMPv4TypeCode(uint8(ipv4.ICMPTypeEcho), 0),
@@ -231,6 +234,7 @@ func assertIPLayer(t *testing.T, expected, actual *IP) {
 	require.Equal(t, expected.Src, actual.Src)
 	require.Equal(t, expected.Dst, actual.Dst)
 	require.Equal(t, expected.Protocol, actual.Protocol)
+	require.Equal(t, expected.TTL, actual.TTL)
 }
 
 type UDP struct {

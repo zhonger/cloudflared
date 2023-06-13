@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/getsentry/raven-go"
+	"github.com/getsentry/sentry-go"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/urfave/cli/v2"
@@ -40,7 +40,16 @@ func NewCertReloader(certPath, keyPath string) (*CertReloader, error) {
 }
 
 // Cert returns the TLS certificate most recently read by the CertReloader.
+// This method works as a direct utility method for tls.Config#Cert.
 func (cr *CertReloader) Cert(clientHello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+	cr.Lock()
+	defer cr.Unlock()
+	return cr.certificate, nil
+}
+
+// ClientCert returns the TLS certificate most recently read by the CertReloader.
+// This method works as a direct utility method for tls.Config#ClientCert.
+func (cr *CertReloader) ClientCert(certRequestInfo *tls.CertificateRequestInfo) (*tls.Certificate, error) {
 	cr.Lock()
 	defer cr.Unlock()
 	return cr.certificate, nil
@@ -56,7 +65,7 @@ func (cr *CertReloader) LoadCert() error {
 
 	// Keep the old certificate if there's a problem reading the new one.
 	if err != nil {
-		raven.CaptureError(fmt.Errorf("Error parsing X509 key pair: %v", err), nil)
+		sentry.CaptureException(fmt.Errorf("Error parsing X509 key pair: %v", err))
 		return err
 	}
 	cr.certificate = &cert
@@ -131,7 +140,10 @@ func CreateTunnelConfig(c *cli.Context, serverName string) (*tls.Config, error) 
 	}
 
 	if tlsConfig.RootCAs == nil {
-		rootCAPool := x509.NewCertPool()
+		rootCAPool, err := x509.SystemCertPool()
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to get x509 system cert pool")
+		}
 		cfRootCA, err := GetCloudflareRootCA()
 		if err != nil {
 			return nil, errors.Wrap(err, "could not append Cloudflare Root CAs to cloudflared certificate pool")

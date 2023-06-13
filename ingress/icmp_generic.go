@@ -1,15 +1,31 @@
-//go:build !darwin
+//go:build !darwin && !linux && (!windows || !cgo)
 
 package ingress
 
 import (
+	"context"
 	"fmt"
-	"net"
+	"net/netip"
 	"runtime"
+	"time"
 
 	"github.com/rs/zerolog"
+
+	"github.com/cloudflare/cloudflared/packet"
 )
 
-func newICMPProxy(listenIP net.IP, logger *zerolog.Logger) (ICMPProxy, error) {
-	return nil, fmt.Errorf("ICMP proxy is not implemented on %s", runtime.GOOS)
+var errICMPProxyNotImplemented = fmt.Errorf("ICMP proxy is not implemented on %s %s", runtime.GOOS, runtime.GOARCH)
+
+type icmpProxy struct{}
+
+func (ip icmpProxy) Request(ctx context.Context, pk *packet.ICMP, responder *packetResponder) error {
+	return errICMPProxyNotImplemented
+}
+
+func (ip *icmpProxy) Serve(ctx context.Context) error {
+	return errICMPProxyNotImplemented
+}
+
+func newICMPProxy(listenIP netip.Addr, zone string, logger *zerolog.Logger, idleTimeout time.Duration) (*icmpProxy, error) {
+	return nil, errICMPProxyNotImplemented
 }

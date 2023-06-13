@@ -11,7 +11,7 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/getsentry/raven-go"
+	"github.com/getsentry/sentry-go"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/urfave/cli/v2"
@@ -37,16 +37,13 @@ const (
 	sshConfigTemplate  = `
 Add to your {{.Home}}/.ssh/config:
 
-Host {{.Hostname}}
 {{- if .ShortLivedCerts}}
-  ProxyCommand bash -c '{{.Cloudflared}} access ssh-gen --hostname %h; ssh -tt %r@cfpipe-{{.Hostname}} >&2 <&1'
-
-Host cfpipe-{{.Hostname}}
-  HostName {{.Hostname}}
+Match host {{.Hostname}} exec "{{.Cloudflared}} access ssh-gen --hostname %h"
   ProxyCommand {{.Cloudflared}} access ssh --hostname %h
-  IdentityFile ~/.cloudflared/{{.Hostname}}-cf_key
-  CertificateFile ~/.cloudflared/{{.Hostname}}-cf_key-cert.pub
+  IdentityFile ~/.cloudflared/%h-cf_key
+  CertificateFile ~/.cloudflared/%h-cf_key-cert.pub
 {{- else}}
+Host {{.Hostname}}
   ProxyCommand {{.Cloudflared}} access ssh --hostname %h
 {{end}}
 `
@@ -205,7 +202,11 @@ func Commands() []*cli.Command {
 
 // login pops up the browser window to do the actual login and JWT generation
 func login(c *cli.Context) error {
-	if err := raven.SetDSN(sentryDSN); err != nil {
+	err := sentry.Init(sentry.ClientOptions{
+		Dsn:     sentryDSN,
+		Release: c.App.Version,
+	})
+	if err != nil {
 		return err
 	}
 
@@ -254,7 +255,11 @@ func ensureURLScheme(url string) string {
 
 // curl provides a wrapper around curl, passing Access JWT along in request
 func curl(c *cli.Context) error {
-	if err := raven.SetDSN(sentryDSN); err != nil {
+	err := sentry.Init(sentry.ClientOptions{
+		Dsn:     sentryDSN,
+		Release: c.App.Version,
+	})
+	if err != nil {
 		return err
 	}
 	log := logger.CreateLoggerFromContext(c, logger.EnableTerminalLog)
@@ -275,6 +280,13 @@ func curl(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
+
+	// Verify that the existing token is still good; if not fetch a new one
+	if err := verifyTokenAtEdge(appURL, appInfo, c, log); err != nil {
+		log.Err(err).Msg("Could not verify token")
+		return err
+	}
+
 	tok, err := token.GetAppTokenIfExists(appInfo)
 	if err != nil || tok == "" {
 		if allowRequest {
@@ -317,7 +329,11 @@ func run(cmd string, args ...string) error {
 
 // token dumps provided token to stdout
 func generateToken(c *cli.Context) error {
-	if err := raven.SetDSN(sentryDSN); err != nil {
+	err := sentry.Init(sentry.ClientOptions{
+		Dsn:     sentryDSN,
+		Release: c.App.Version,
+	})
+	if err != nil {
 		return err
 	}
 	appURL, err := url.Parse(ensureURLScheme(c.String("app")))
